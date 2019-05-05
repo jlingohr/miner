@@ -1,4 +1,4 @@
-# miner
+# rfs-miner
 
 A simple distributed file system that runs on top of a custom blockchain network. The records file system (RFS) will have a global name space and no access control mechanism. Files in RFS are composed of fixed-length records that can either be read or appended (previously appended records cannot be modified). The blockchain network will be a randomly connected peer-to-peer network that is loosely based on BitCoin: clients submit operations on files, these operations are flooded among nodes, and nodes mine blocks to add operations to the blockchain. Use proof of work to counter sybil nodes/spam and incentivize mining with record coins, which are units of storage in RFS and are necessary for clients to create files/add new records to files.
 
