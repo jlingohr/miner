@@ -2,7 +2,7 @@ package bclib
 
 import (
 	"errors"
-	"github.com/jlingohr/miner/settings"
+	"github.com/jlingohr/rfs-miner/settings"
 	"sync"
 )
 

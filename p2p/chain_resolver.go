@@ -1,7 +1,7 @@
 package p2p
 
 import (
-	"github.com/jlingohr/miner/bclib"
+	"github.com/jlingohr/rfs-miner/bclib"
 )
 
 type ChainResolver struct {

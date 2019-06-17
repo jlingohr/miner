@@ -1,7 +1,7 @@
 package mining
 
 import (
-	"github.com/jlingohr/miner/bclib"
+	"github.com/jlingohr/rfs-miner/bclib"
 	"log"
 )
 

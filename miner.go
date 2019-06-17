@@ -1,9 +1,9 @@
 package main
 
 import (
-	"github.ugrad.cs.ubc.ca/CPSC416-2018W-T1/P1-x4w7-n3u0b/bclib"
-	"github.ugrad.cs.ubc.ca/CPSC416-2018W-T1/P1-x4w7-n3u0b/p2p"
-	"github.ugrad.cs.ubc.ca/CPSC416-2018W-T1/P1-x4w7-n3u0b/settings"
+	"github.com/jlingohr/rfs-miner/bclib"
+	"github.com/jlingohr/rfs-miner/p2p"
+	"github.com/jlingohr/rfs-miner/settings"
 	"log"
 	"os"
 )

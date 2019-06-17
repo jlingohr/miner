@@ -1,8 +1,8 @@
 package p2p
 
 import (
-	"github.com/jlingohr/miner/bclib"
-	"github.com/jlingohr/miner/settings"
+	"github.com/jlingohr/rfs-miner/bclib"
+	"github.com/jlingohr/rfs-miner/settings"
 	"log"
 	"sync"
 	"time"
@@ -15,15 +15,15 @@ type ChainManager struct {
 	//downloader    *Downloader
 	chainResolver *ChainResolver
 
-	//floodBlock            chan MakeFloodBlockReq
-	syncBlockchain        chan SynchronizeBlockchain
-	addBlock              chan bclib.Block
-	receiveFloodedBlock   chan bclib.Block
-	sendBlock 		      chan bclib.Block
-	continueMining        chan struct{}
-	newBlockAdded         chan struct{}
-	downloadBlock         chan bclib.Block
-	downloadedBlocks	  chan []bclib.Block
+	floodBlock            chan MakeFloodBlockReq
+	syncBlockchain      chan SynchronizeBlockchain
+	addBlock            chan bclib.Block
+	receiveFloodedBlock chan bclib.Block
+	sendBlock           chan bclib.Block
+	continueMining      chan struct{}
+	newBlockAdded       chan struct{}
+	downloadBlock       chan bclib.Block
+	downloadedBlocks    chan []bclib.Block
 
 	isMining bool
 
@@ -34,15 +34,15 @@ type ChainManager struct {
 func NewChainManager(bc *bclib.Blockchain, config settings.Settings) *ChainManager {
 	//makeRequestChan := make(chan MakeFloodBlockReq)
 	manager := &ChainManager{
-		blockchain:            bc,
-		config:                config,
+		blockchain: bc,
+		config:     config,
 		//floodBlock:            makeRequestChan,
-		syncBlockchain:        make(chan SynchronizeBlockchain),
-		addBlock:              make(chan bclib.Block, 100), //This needs to be buffered since the goroutine consuming also writes
-		receiveFloodedBlock:   make(chan bclib.Block, 1000), // This also needs to be buffered for the same reason
-		continueMining:        make(chan struct{}),
-		downloadedBlocks:      make(chan []bclib.Block),
-		sendBlock:      	   make(chan bclib.Block),
+		syncBlockchain:      make(chan SynchronizeBlockchain),
+		addBlock:            make(chan bclib.Block, 100),  //This needs to be buffered since the goroutine consuming also writes
+		receiveFloodedBlock: make(chan bclib.Block, 1000), // This also needs to be buffered for the same reason
+		continueMining:      make(chan struct{}),
+		downloadedBlocks:    make(chan []bclib.Block),
+		sendBlock:           make(chan bclib.Block),
 
 		//downloader:    NewDownloader(config.MinerID, config.IncomingMinersAddr, makeRequestChan),
 		chainResolver: NewChainResolver(),
@@ -115,9 +115,9 @@ func (m *ChainManager) manageBlockchain() {
 				replayMap[string(block.Hash)] = struct{}{}
 			}
 
-		case blocks := <- m.downloadedBlocks:
+		case blocks := <-m.downloadedBlocks:
 			log.Printf("%s resolving %d blocks from block %x", m.config.MinerID, len(blocks), replayQueue[0])
-			replaySlice := make([]bclib.Block, 0, len(replayQueue) + len(blocks))
+			replaySlice := make([]bclib.Block, 0, len(replayQueue)+len(blocks))
 			for _, block := range blocks {
 				replaySlice = append(replaySlice, block)
 				replayMap[string(block.Hash)] = struct{}{}
@@ -138,7 +138,6 @@ func (m *ChainManager) manageBlockchain() {
 			m.mux.Lock()
 			err := m.blockchain.AddBlock(&block)
 			m.mux.Unlock()
-
 
 			if err != nil {
 				log.Printf("%s failed to add block with hash %x mined by %s - %s", m.config.MinerID, block.Hash, block.MinerID, err)

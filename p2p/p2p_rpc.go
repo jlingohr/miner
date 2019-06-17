@@ -3,9 +3,9 @@ package p2p
 import (
 	"errors"
 	"fmt"
-	"github.com/jlingohr/miner/bclib"
-	"github.com/jlingohr/miner/mining"
-	"github.com/jlingohr/miner/settings"
+	"github.com/jlingohr/rfs-miner/bclib"
+	"github.com/jlingohr/rfs-miner/mining"
+	"github.com/jlingohr/rfs-miner/settings"
 	"log"
 	"net"
 	"net/rpc"
@@ -39,9 +39,9 @@ type MinerServer struct {
 	newPeer            chan *Peer
 	removePeers        chan string
 	downloadPrevBlocks chan bclib.Block
-	downloadedBlocks chan []bclib.Block
-	downloadErrs chan error
-	peerErrs chan PeerError
+	downloadedBlocks   chan []bclib.Block
+	downloadErrs       chan error
+	peerErrs           chan PeerError
 
 	manager *ChainManager
 }
@@ -116,8 +116,8 @@ func (ms *MinerServer) DialPeer(info NewPeerInfo, resp *NewPeerResponse) error {
 }
 
 type FloodBlockReq struct {
-	Block            bclib.Block
-	FromMinerId      string
+	Block       bclib.Block
+	FromMinerId string
 }
 
 type NewFloodBlockReq struct {
@@ -238,11 +238,11 @@ func NewMinerServer(config settings.Settings) (*MinerServer, error) {
 		stopMining:         make(chan struct{}),
 		downloadPrevBlocks: make(chan bclib.Block),
 
-		newPeer:     make(chan *Peer),
-		removePeers: make(chan string),
+		newPeer:          make(chan *Peer),
+		removePeers:      make(chan string),
 		downloadedBlocks: make(chan []bclib.Block),
-		downloadErrs: make(chan error),
-		peerErrs: make(chan PeerError),
+		downloadErrs:     make(chan error),
+		peerErrs:         make(chan PeerError),
 
 		manager: manager,
 	}
@@ -403,14 +403,14 @@ func (ms *MinerServer) buildPendingOperations() <-chan []bclib.Operation {
 func (ms *MinerServer) managePeers() {
 	defer ms.wg.Done()
 
-	ticker := time.NewTicker(5*time.Second)
+	ticker := time.NewTicker(5 * time.Second)
 
 	peers := make(map[string]*Peer)
 	blocksToPeers := make(map[string][]string) //map which peers have sent us which blocks
 
 	for {
 		select {
-		case <- ticker.C:
+		case <-ticker.C:
 			log.Println("ManagePeers Heartbeat")
 		case <-ms.stop:
 			log.Printf("%s closing all peer connections", ms.config.MinerID)
@@ -427,7 +427,7 @@ func (ms *MinerServer) managePeers() {
 			if len(peers) > 0 {
 				ms.mine <- struct{}{}
 			}
-		case req := <- ms.receivedBlocks:
+		case req := <-ms.receivedBlocks:
 			fromID := req.FromMinerId
 			block := req.Block
 
@@ -440,7 +440,7 @@ func (ms *MinerServer) managePeers() {
 
 			ms.manager.receiveFloodedBlock <- block
 
-		case block := <- ms.downloadPrevBlocks:
+		case block := <-ms.downloadPrevBlocks:
 			log.Printf("%s trying to download %x", ms.config.MinerID, block.PreviousHash)
 			miners, ok := blocksToPeers[string(block.Hash)]
 			if ok {
@@ -449,10 +449,10 @@ func (ms *MinerServer) managePeers() {
 					if ok {
 						peer.requestBlocks <- block.PreviousHash
 						select {
-						case blocks := <- ms.downloadedBlocks:
+						case blocks := <-ms.downloadedBlocks:
 							ms.manager.downloadedBlocks <- blocks
 							log.Println("SENT DOWNLOADED BLOCKS OVER THE CHAN")
-						case err := <- ms.downloadErrs:
+						case err := <-ms.downloadErrs:
 							log.Printf("%s downloading blocks from %s - %s", ms.config.MinerID, peer.MinerID, err)
 							continue
 						}
@@ -471,8 +471,8 @@ func (ms *MinerServer) managePeers() {
 			}
 
 			req := FloodBlockReq{
-				Block:            block,
-				FromMinerId:      ms.config.MinerID,
+				Block:       block,
+				FromMinerId: ms.config.MinerID,
 			}
 
 			for peerMinerId := range peers {
@@ -523,7 +523,7 @@ func (ms *MinerServer) managePeers() {
 			}
 			log.Printf("%s flooded operation %s", ms.config.MinerID, opFloodReq.Operation.OperationID)
 
-		case err := <- ms.peerErrs:
+		case err := <-ms.peerErrs:
 			log.Printf("%s removing peer %s - %s", ms.config.MinerID, err.minerID, err.err)
 			peer, ok := peers[err.minerID]
 			if !ok {
@@ -538,7 +538,7 @@ func (ms *MinerServer) managePeers() {
 
 type PeerError struct {
 	minerID string
-	err error
+	err     error
 }
 
 func StringSetToList(set map[string]struct{}) []string {

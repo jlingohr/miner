@@ -2,9 +2,8 @@ package p2p
 
 import (
 	"bytes"
-	"github.com/jlingohr/miner/bclib"
-	"github.com/jlingohr/miner/settings"
-	"log"
+	"github.com/jlingohr/rfs-miner/bclib"
+	"github.com/jlingohr/rfs-miner/settings"
 	"sync"
 	"testing"
 	"time"
@@ -72,7 +71,7 @@ func TestAddOwnAndFloodSingleBlock(t *testing.T) {
 	}()
 
 	go func() {
-		<- manager.newBlockAdded
+		<-manager.newBlockAdded
 		return
 	}()
 
@@ -128,7 +127,7 @@ func TestAddOtherAndFloodSingleBlock(t *testing.T) {
 	}()
 
 	go func() {
-		<- manager.newBlockAdded
+		<-manager.newBlockAdded
 		return
 	}()
 
@@ -173,197 +172,197 @@ func TestAddOtherAndFloodSingleBlock(t *testing.T) {
 // 1) receiving from channels:
 // - manager.floodBlock
 // 2) manager.isMining == true
-func TestFloodingBlockCanAdd(t *testing.T) {
-	bc1 := bclib.NewBlockchain(config)
-	manager := NewChainManager(bc1, createSettings(minerID, make([]string, 0), minerPeerAddress, outgoingMinersIP, minerClientAddress))
-	manager.newBlockAdded = make(chan struct{})
-
-	go func() {
-		<- manager.newBlockAdded
-		return
-	}()
-
-	serverA, err := NewMinerServer(configA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	serverA.startListening()
-
-	err = serverA.manager.blockchain.AddBlock(blockA)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	peerBlocks := serverA.manager.blockchain.GetSize()
-	if peerBlocks != 2 {
-		t.Fatalf("Expect peer to have 2 blocks, got %d", peerBlocks)
-	}
-
-	go func() {
-		<-time.After(1 * time.Second)
-		manager.receiveFloodedBlock <- NewFloodBlockReq{floodedReqA, make(chan struct{})}
-	}()
-
-	<-time.After(5 * time.Second)
-	numBlocks := bc1.GetSize()
-	if numBlocks != 2 {
-		t.Errorf("Expected %d blocks in blockchain, got %d", 2, numBlocks)
-	}
-
-	serverA.shutdown()
-}
-
-//Test that if we are flooded a block for which we do not have the previous hash that we can
-//download the missing block
-func TestCanDownloadSingleBlock(t *testing.T) {
-	bc1 := bclib.NewBlockchain(config)
-	manager := NewChainManager(bc1, createSettings(minerID, make([]string, 0), minerPeerAddress, outgoingMinersIP, minerClientAddress))
-	manager.newBlockAdded = make(chan struct{})
-
-	go func() {
-		<- manager.newBlockAdded
-		return
-	}()
-
-	serverB, err := NewMinerServer(configB)
-	if err != nil {
-		t.Fatal(err)
-	}
-	serverB.startListening()
-
-	err = serverB.manager.blockchain.AddBlock(blockA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = serverB.manager.blockchain.AddBlock(blockB)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	peerBlocks := serverB.manager.blockchain.GetSize()
-	if peerBlocks != 3 {
-		t.Fatalf("Expect peer to have 3 blocks, got %d", peerBlocks)
-	}
-
-	go func() {
-		<-time.After(1 * time.Second)
-		manager.downloader.floodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerB, Block: *blockA, FromMinerAddress: addressB}, make(chan struct{})}
-		<-time.After(1 * time.Second)
-		manager.receiveFloodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerB, Block: *blockB, FromMinerAddress: addressB}, make(chan struct{})}
-	}()
-
-	go func() {
-		for req := range manager.floodBlock {
-			log.Printf("Test draining block %x", req.Block.Hash)
-			hash := string(req.Block.Hash)
-			if hash != string(blockA.Hash) && hash != string(blockB.Hash) {
-				t.Fatalf("Expected to flood block with hash %x or %x, but flooding %x",
-					blockA.Hash, blockB.Hash, req.Block.Hash)
-				return
-			}
-
-			if req.FromMinerId != minerID {
-				t.Fatalf("Expected to flood from miner %s, but got %s", minerID, req.FromMinerId)
-				return
-			}
-
-			if len(req.ignorePeers) != 1 {
-				t.Fatalf("Expected to ignore 1 peer, got %d", len(req.ignorePeers))
-				return
-			}
-		}
-	}()
-
-	<-time.After(5 * time.Second)
-	numBlocks := bc1.GetSize()
-	if numBlocks != 3 {
-		t.Errorf("Expected %d blocks in blockchain, got %d", 3, numBlocks)
-	}
-}
-
-func TestResolvingSimpeDownloadChain(t *testing.T) {
-	bc1 := bclib.NewBlockchain(config)
-	manager := NewChainManager(bc1, createSettings(minerID, make([]string, 0), minerPeerAddress, outgoingMinersIP, minerClientAddress))
-	manager.newBlockAdded = make(chan struct{})
-
-	done := make(chan struct{})
-
-	go func() {
-		for {
-			select {
-			case <- done:
-				return
-			case <- manager.newBlockAdded:
-			}
-		}
-
-	}()
-
-	serverC, err := NewMinerServer(configC)
-	if err != nil {
-		t.Fatal(err)
-	}
-	serverC.startListening()
-
-	err = serverC.manager.blockchain.AddBlock(blockA)
-	if err != nil {
-		t.Fatal(err)
-	}
-	err = serverC.manager.blockchain.AddBlock(blockB)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	err = serverC.manager.blockchain.AddBlock(blockC)
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	peerBlocks := serverC.manager.blockchain.GetSize()
-	if peerBlocks != 4 {
-		t.Fatalf("Expect peer to have 3 blocks, got %d", peerBlocks)
-	}
-
-	log.Printf("Block A: %x, Block B: %x, Block C: %x", blockA.Hash, blockB.Hash, blockC.Hash)
-	go func() {
-		<-time.After(1 * time.Second)
-		manager.downloader.floodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockA, FromMinerAddress: addressC}, make(chan struct{})}
-		<-time.After(1 * time.Second)
-		manager.downloader.floodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockB, FromMinerAddress: addressC}, make(chan struct{})}
-		manager.receiveFloodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockC, FromMinerAddress: addressC}, make(chan struct{})}
-		// Flood a block out of order
-		manager.receiveFloodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockA, FromMinerAddress: addressC}, make(chan struct{})}
-	}()
-
-	go func() {
-		for req := range manager.floodBlock {
-			log.Printf("Test draining block %x", req.Block.Hash)
-			hash := string(req.Block.Hash)
-			if hash != string(blockA.Hash) && hash != string(blockB.Hash) && hash != string(blockC.Hash) {
-				t.Fatalf("Expected to flood block with hash %x or %x, but flooding %x",
-					blockA.Hash, blockB.Hash, req.Block.Hash)
-				return
-			}
-
-			if req.FromMinerId != minerID {
-				t.Fatalf("Expected to flood from miner %s, but got %s", minerID, req.FromMinerId)
-				return
-			}
-
-			if len(req.ignorePeers) != 1 {
-				t.Fatalf("Expected to ignore 1 peer, got %d", len(req.ignorePeers))
-				return
-			}
-		}
-	}()
-
-	//done := make(chan struct{})
-	//<- done
-	<-time.After(5 * time.Second)
-	numBlocks := bc1.GetSize()
-	if numBlocks != 4 {
-		t.Errorf("Expected %d blocks in blockchain, got %d", 4, numBlocks)
-	}
-
-	close(done)
-}
+//func TestFloodingBlockCanAdd(t *testing.T) {
+//	bc1 := bclib.NewBlockchain(config)
+//	manager := NewChainManager(bc1, createSettings(minerID, make([]string, 0), minerPeerAddress, outgoingMinersIP, minerClientAddress))
+//	manager.newBlockAdded = make(chan struct{})
+//
+//	go func() {
+//		<-manager.newBlockAdded
+//		return
+//	}()
+//
+//	serverA, err := NewMinerServer(configA)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//	serverA.startListening()
+//
+//	err = serverA.manager.blockchain.AddBlock(blockA)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	peerBlocks := serverA.manager.blockchain.GetSize()
+//	if peerBlocks != 2 {
+//		t.Fatalf("Expect peer to have 2 blocks, got %d", peerBlocks)
+//	}
+//
+//	go func() {
+//		<-time.After(1 * time.Second)
+//		manager.receiveFloodedBlock <- NewFloodBlockReq{floodedReqA, make(chan struct{})}
+//	}()
+//
+//	<-time.After(5 * time.Second)
+//	numBlocks := bc1.GetSize()
+//	if numBlocks != 2 {
+//		t.Errorf("Expected %d blocks in blockchain, got %d", 2, numBlocks)
+//	}
+//
+//	serverA.shutdown()
+//}
+//
+////Test that if we are flooded a block for which we do not have the previous hash that we can
+////download the missing block
+//func TestCanDownloadSingleBlock(t *testing.T) {
+//	bc1 := bclib.NewBlockchain(config)
+//	manager := NewChainManager(bc1, createSettings(minerID, make([]string, 0), minerPeerAddress, outgoingMinersIP, minerClientAddress))
+//	manager.newBlockAdded = make(chan struct{})
+//
+//	go func() {
+//		<-manager.newBlockAdded
+//		return
+//	}()
+//
+//	serverB, err := NewMinerServer(configB)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//	serverB.startListening()
+//
+//	err = serverB.manager.blockchain.AddBlock(blockA)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//	err = serverB.manager.blockchain.AddBlock(blockB)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	peerBlocks := serverB.manager.blockchain.GetSize()
+//	if peerBlocks != 3 {
+//		t.Fatalf("Expect peer to have 3 blocks, got %d", peerBlocks)
+//	}
+//
+//	go func() {
+//		<-time.After(1 * time.Second)
+//		manager.downloader.floodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerB, Block: *blockA, FromMinerAddress: addressB}, make(chan struct{})}
+//		<-time.After(1 * time.Second)
+//		manager.receiveFloodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerB, Block: *blockB, FromMinerAddress: addressB}, make(chan struct{})}
+//	}()
+//
+//	go func() {
+//		for req := range manager.floodBlock {
+//			log.Printf("Test draining block %x", req.Block.Hash)
+//			hash := string(req.Block.Hash)
+//			if hash != string(blockA.Hash) && hash != string(blockB.Hash) {
+//				t.Fatalf("Expected to flood block with hash %x or %x, but flooding %x",
+//					blockA.Hash, blockB.Hash, req.Block.Hash)
+//				return
+//			}
+//
+//			if req.FromMinerId != minerID {
+//				t.Fatalf("Expected to flood from miner %s, but got %s", minerID, req.FromMinerId)
+//				return
+//			}
+//
+//			if len(req.ignorePeers) != 1 {
+//				t.Fatalf("Expected to ignore 1 peer, got %d", len(req.ignorePeers))
+//				return
+//			}
+//		}
+//	}()
+//
+//	<-time.After(5 * time.Second)
+//	numBlocks := bc1.GetSize()
+//	if numBlocks != 3 {
+//		t.Errorf("Expected %d blocks in blockchain, got %d", 3, numBlocks)
+//	}
+//}
+//
+//func TestResolvingSimpeDownloadChain(t *testing.T) {
+//	bc1 := bclib.NewBlockchain(config)
+//	manager := NewChainManager(bc1, createSettings(minerID, make([]string, 0), minerPeerAddress, outgoingMinersIP, minerClientAddress))
+//	manager.newBlockAdded = make(chan struct{})
+//
+//	done := make(chan struct{})
+//
+//	go func() {
+//		for {
+//			select {
+//			case <-done:
+//				return
+//			case <-manager.newBlockAdded:
+//			}
+//		}
+//
+//	}()
+//
+//	serverC, err := NewMinerServer(configC)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//	serverC.startListening()
+//
+//	err = serverC.manager.blockchain.AddBlock(blockA)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//	err = serverC.manager.blockchain.AddBlock(blockB)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	err = serverC.manager.blockchain.AddBlock(blockC)
+//	if err != nil {
+//		t.Fatal(err)
+//	}
+//
+//	peerBlocks := serverC.manager.blockchain.GetSize()
+//	if peerBlocks != 4 {
+//		t.Fatalf("Expect peer to have 3 blocks, got %d", peerBlocks)
+//	}
+//
+//	log.Printf("Block A: %x, Block B: %x, Block C: %x", blockA.Hash, blockB.Hash, blockC.Hash)
+//	go func() {
+//		<-time.After(1 * time.Second)
+//		manager.downloader.floodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockA, FromMinerAddress: addressC}, make(chan struct{})}
+//		<-time.After(1 * time.Second)
+//		manager.downloader.floodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockB, FromMinerAddress: addressC}, make(chan struct{})}
+//		manager.receiveFloodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockC, FromMinerAddress: addressC}, make(chan struct{})}
+//		// Flood a block out of order
+//		manager.receiveFloodedBlock <- NewFloodBlockReq{FloodBlockReq{FromMinerId: minerC, Block: *blockA, FromMinerAddress: addressC}, make(chan struct{})}
+//	}()
+//
+//	go func() {
+//		for req := range manager.floodBlock {
+//			log.Printf("Test draining block %x", req.Block.Hash)
+//			hash := string(req.Block.Hash)
+//			if hash != string(blockA.Hash) && hash != string(blockB.Hash) && hash != string(blockC.Hash) {
+//				t.Fatalf("Expected to flood block with hash %x or %x, but flooding %x",
+//					blockA.Hash, blockB.Hash, req.Block.Hash)
+//				return
+//			}
+//
+//			if req.FromMinerId != minerID {
+//				t.Fatalf("Expected to flood from miner %s, but got %s", minerID, req.FromMinerId)
+//				return
+//			}
+//
+//			if len(req.ignorePeers) != 1 {
+//				t.Fatalf("Expected to ignore 1 peer, got %d", len(req.ignorePeers))
+//				return
+//			}
+//		}
+//	}()
+//
+//	//done := make(chan struct{})
+//	//<- done
+//	<-time.After(5 * time.Second)
+//	numBlocks := bc1.GetSize()
+//	if numBlocks != 4 {
+//		t.Errorf("Expected %d blocks in blockchain, got %d", 4, numBlocks)
+//	}
+//
+//	close(done)
+//}

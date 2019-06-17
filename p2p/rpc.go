@@ -1,8 +1,8 @@
 package p2p
 
 import (
-	"github.com/jlingohr/miner/bclib"
-	"github.com/jlingohr/miner/rfslib"
+	"github.com/jlingohr/rfs-miner/bclib"
+	"github.com/jlingohr/rfs-miner/rfslib"
 	"log"
 	"math"
 	"net"
@@ -39,7 +39,6 @@ type Server struct {
 	receivedOp      chan bclib.Operation
 	havePeers       chan bool
 	isConnected     bool
-
 }
 
 func (s *Server) ReadRecord(recInfo rfslib.ReadRecordInfo, resp *rfslib.Record) error {
